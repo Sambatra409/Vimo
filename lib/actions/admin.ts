@@ -4,21 +4,50 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth";
 
+/** Helper : récupère les profiles correspondant à une liste d'user_ids */
+async function fetchProfilesMap(userIds: string[]) {
+  if (userIds.length === 0) return new Map();
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("profiles")
+    .select("id, full_name, email, phone, tokens_balance")
+    .in("id", userIds);
+  return new Map((data ?? []).map((p: any) => [p.id, p]));
+}
+
 // ============================================================================
 // GESTION UTILISATEURS
 // ============================================================================
 export async function listAllUsers(search?: string) {
   await requireRole("admin");
   const admin = createAdminClient();
+
+  // 1. Récupérer les profils
   let qy = admin
     .from("profiles")
-    .select("*, user_roles(role)")
+    .select("*")
     .order("created_at", { ascending: false })
     .limit(100);
   if (search && search.trim())
     qy = qy.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
-  const { data } = await qy;
-  return (data ?? []).map((p: any) => ({
+  const { data: profiles } = await qy;
+  if (!profiles || profiles.length === 0) return [];
+
+  // 2. Récupérer les rôles séparément
+  const ids = profiles.map((p) => p.id);
+  const { data: rolesData } = await admin
+    .from("user_roles")
+    .select("user_id, role")
+    .in("user_id", ids);
+
+  const rolesMap = new Map<string, string[]>();
+  for (const r of rolesData ?? []) {
+    const arr = rolesMap.get(r.user_id) ?? [];
+    arr.push(r.role);
+    rolesMap.set(r.user_id, arr);
+  }
+
+  return profiles.map((p: any) => ({
     id: p.id,
     full_name: p.full_name,
     email: p.email,
@@ -26,7 +55,7 @@ export async function listAllUsers(search?: string) {
     tokens_balance: p.tokens_balance,
     is_banned: p.is_banned ?? false,
     is_kyc_verified: p.is_kyc_verified,
-    roles: (p.user_roles ?? []).map((r: any) => r.role),
+    roles: rolesMap.get(p.id) ?? [],
     created_at: p.created_at,
   }));
 }
@@ -127,12 +156,23 @@ export async function toggleUserRoleAction(
 export async function listAllPurchases() {
   await requireRole("admin");
   const admin = createAdminClient();
-  const { data } = await admin
+
+  // 1. Récupérer les achats
+  const { data: purchases } = await admin
     .from("token_purchases")
-    .select("*, profiles!inner(full_name, email)")
+    .select("*")
     .order("created_at", { ascending: false })
     .limit(100);
-  return data ?? [];
+  if (!purchases || purchases.length === 0) return [];
+
+  // 2. Récupérer les profils séparément
+  const userIds = [...new Set(purchases.map((p) => p.user_id))];
+  const profilesMap = await fetchProfilesMap(userIds);
+
+  return purchases.map((p: any) => ({
+    ...p,
+    profiles: profilesMap.get(p.user_id) ?? null,
+  }));
 }
 
 export async function approvePurchaseAction(purchaseId: string, note: string) {
@@ -180,6 +220,7 @@ export async function approvePurchaseAction(purchaseId: string, note: string) {
   }
 
   revalidatePath("/dashboard/admin");
+  revalidatePath("/dashboard/admin/purchases");
   revalidatePath("/tokens");
   return { ok: true };
 }
@@ -207,6 +248,7 @@ export async function rejectPurchaseAction(purchaseId: string, note: string) {
     })
     .eq("id", purchaseId);
   revalidatePath("/dashboard/admin");
+  revalidatePath("/dashboard/admin/purchases");
   revalidatePath("/tokens");
   return { ok: true };
 }
@@ -325,14 +367,25 @@ export async function getAdminOverview() {
 export async function listAllPropertiesForAdmin(search?: string) {
   await requireRole("admin");
   const admin = createAdminClient();
+
+  // 1. Récupérer les annonces
   let qy = admin
     .from("properties")
-    .select("id, title, city, price, listing_type, property_type, status, is_premium, is_verified, view_count, created_at, profiles!properties_owner_id_fkey(full_name, email)")
+    .select("id, title, city, price, listing_type, property_type, status, is_premium, is_verified, view_count, created_at, owner_id")
     .order("created_at", { ascending: false })
     .limit(100);
   if (search && search.trim()) qy = qy.ilike("title", `%${search}%`);
-  const { data } = await qy;
-  return data ?? [];
+  const { data: properties } = await qy;
+  if (!properties || properties.length === 0) return [];
+
+  // 2. Récupérer les profils des propriétaires séparément
+  const ownerIds = [...new Set(properties.map((p) => p.owner_id))];
+  const profilesMap = await fetchProfilesMap(ownerIds);
+
+  return properties.map((p: any) => ({
+    ...p,
+    profiles: profilesMap.get(p.owner_id) ?? null,
+  }));
 }
 
 export async function adminDeletePropertyAction(propertyId: string) {
