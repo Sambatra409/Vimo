@@ -10,18 +10,24 @@ import type { OwnerContact } from "@/lib/types";
 
 interface Props {
   propertyId: string;
+  ownerId: string;
   initialUnlocked: boolean;
   isLoggedIn: boolean;
   isFreeMode: boolean;
   unlockCost: number;
+  contactPhone1: string | null;
+  contactPhone2: string | null;
 }
 
 export function ContactPanel({
   propertyId,
+  ownerId,
   initialUnlocked,
   isLoggedIn,
   isFreeMode,
   unlockCost,
+  contactPhone1,
+  contactPhone2,
 }: Props) {
   const router = useRouter();
   const [unlocked, setUnlocked] = useState(initialUnlocked);
@@ -112,18 +118,34 @@ export function ContactPanel({
               <p className="text-sm font-medium truncate">{owner.full_name}</p>
             </div>
           </div>
-          {owner.phone && (
+          {contactPhone1 && (
             <div className="flex items-start gap-3">
               <Phone className="size-4 text-muted-foreground mt-0.5 shrink-0" />
               <div className="min-w-0">
                 <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
-                  Téléphone
+                  Téléphone principal
                 </p>
                 <a
-                  href={`tel:${owner.phone}`}
+                  href={`tel:${contactPhone1.replace(/\s/g, "")}`}
                   className="text-sm font-medium font-mono hover:text-primary"
                 >
-                  {owner.phone}
+                  {contactPhone1}
+                </a>
+              </div>
+            </div>
+          )}
+          {contactPhone2 && (
+            <div className="flex items-start gap-3">
+              <Phone className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
+                  Téléphone secondaire
+                </p>
+                <a
+                  href={`tel:${contactPhone2.replace(/\s/g, "")}`}
+                  className="text-sm font-medium font-mono hover:text-primary"
+                >
+                  {contactPhone2}
                 </a>
               </div>
             </div>
@@ -145,7 +167,7 @@ export function ContactPanel({
         </div>
 
         <Link
-          href={`/messages/${propertyId}`}
+          href={`/messages/${propertyId}/${ownerId}`}
           className="w-full min-h-12 py-3 bg-foreground text-background rounded-lg font-semibold text-sm uppercase tracking-wider hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
         >
           <MessageSquare className="size-4" />
