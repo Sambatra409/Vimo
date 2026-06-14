@@ -24,6 +24,8 @@ interface InitialData {
   address?: string;
   city?: string;
   postal_code?: string | null;
+  contact_phone_1?: string | null;
+  contact_phone_2?: string | null;
   photos?: { url: string; display_order: number }[];
 }
 
@@ -48,6 +50,8 @@ export function PropertyForm({ initial }: { initial?: InitialData }) {
   const [address, setAddress] = useState(initial?.address ?? "");
   const [city, setCity] = useState(initial?.city ?? "");
   const [postalCode, setPostalCode] = useState(initial?.postal_code ?? "");
+  const [contactPhone1, setContactPhone1] = useState(initial?.contact_phone_1 ?? "");
+  const [contactPhone2, setContactPhone2] = useState(initial?.contact_phone_2 ?? "");
   const [photoUrls, setPhotoUrls] = useState<string[]>(
     initial?.photos?.sort((a, b) => a.display_order - b.display_order).map((p) => p.url) ?? [],
   );
@@ -66,6 +70,8 @@ export function PropertyForm({ initial }: { initial?: InitialData }) {
       address,
       city,
       postal_code: postalCode || null,
+      contact_phone_1: contactPhone1.trim() || null,
+      contact_phone_2: contactPhone2.trim() || null,
       photos: photoUrls,
     };
 
@@ -266,6 +272,36 @@ export function PropertyForm({ initial }: { initial?: InitialData }) {
               placeholder="101"
               disabled={pending}
               className="w-full min-h-12 px-4 py-3 bg-background border border-border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </Field>
+        </div>
+      </Section>
+
+      {/* Section 6 — Coordonnées de contact */}
+      <Section
+        title="Coordonnées de contact"
+        subtitle="Les numéros affichés aux locataires après qu'ils débloquent votre annonce. Vous pouvez en ajouter 2."
+      >
+        <Field label="Numéro principal" required>
+          <input
+            type="tel"
+            value={contactPhone1}
+            onChange={(e) => setContactPhone1(e.target.value)}
+            required
+            placeholder="034 12 345 67"
+            disabled={pending}
+            className="w-full min-h-12 px-4 py-3 bg-background border border-border rounded-lg text-base font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </Field>
+        <div className="mt-4">
+          <Field label="Numéro secondaire" optional>
+            <input
+              type="tel"
+              value={contactPhone2}
+              onChange={(e) => setContactPhone2(e.target.value)}
+              placeholder="038 12 345 67 (optionnel)"
+              disabled={pending}
+              className="w-full min-h-12 px-4 py-3 bg-background border border-border rounded-lg text-base font-mono focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </Field>
         </div>
