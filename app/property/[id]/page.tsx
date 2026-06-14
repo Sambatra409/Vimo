@@ -15,6 +15,7 @@ import { ContactPanel } from "./contact-panel";
 import { FavoriteButton } from "./favorite-button";
 import { CompareButton } from "./compare-button";
 import { VerificationButton } from "./verification-button";
+import { ReportButton } from "./report-button";
 import { getVerificationStatus } from "@/lib/actions/verification";
 
 interface Props {
@@ -161,8 +162,23 @@ export default async function PropertyDetailPage({ params }: Props) {
               </p>
             </div>
 
-            {/* Panneau contact (client) */}
-            {!isOwner && (
+            {/* Bandeau "Vendu/Loué" si l'annonce est soldée */}
+            {property.status === "sold" && (
+              <div className="bg-verified/15 border-2 border-verified rounded-2xl p-5 text-center">
+                <p className="text-[10px] uppercase tracking-widest font-bold text-verified mb-1">
+                  {isSale ? "Bien vendu" : "Bien loué"}
+                </p>
+                <p className="font-display text-xl italic">
+                  {isSale ? "Vendu" : "Loué"} 🎉
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Cette annonce n'est plus disponible.
+                </p>
+              </div>
+            )}
+
+            {/* Panneau contact (client) — uniquement si annonce active */}
+            {!isOwner && property.status === "active" && (
               <ContactPanel
                 propertyId={property.id}
                 ownerId={property.owner_id}
@@ -185,6 +201,11 @@ export default async function PropertyDetailPage({ params }: Props) {
 
             {/* Bouton comparateur (toujours visible, localStorage) */}
             {!isOwner && <CompareButton propertyId={property.id} />}
+
+            {/* Bouton signaler (pour les non-propriétaires) */}
+            {!isOwner && property.status === "active" && (
+              <ReportButton propertyId={property.id} isLoggedIn={!!user} />
+            )}
 
             {isOwner && (
               <>
