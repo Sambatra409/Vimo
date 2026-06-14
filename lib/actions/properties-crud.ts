@@ -232,7 +232,7 @@ export async function deletePropertyAction(
 }
 
 // ============================================================================
-// TOGGLE STATUS (pause / réactivation)
+// TOGGLE STATUS (pause / réactivation / marquer comme vendu/loué)
 // ============================================================================
 export async function togglePropertyStatusAction(
   propertyId: string,
@@ -243,18 +243,29 @@ export async function togglePropertyStatusAction(
 
   const { data: existing } = await admin
     .from("properties")
-    .select("owner_id")
+    .select("owner_id, status")
     .eq("id", propertyId)
     .single();
   if (!existing) return { ok: false, error: "Introuvable." };
-  if (existing.owner_id !== user.id) return { ok: false, error: "Non autorisé." };
+  if (existing.owner_id !== user.id && !user.roles.includes("admin"))
+    return { ok: false, error: "Non autorisé." };
 
-  await admin
-    .from("properties")
-    .update({ status: newStatus })
-    .eq("id", propertyId);
+  // Construire la mise à jour selon le statut
+  const updates: any = { status: newStatus };
+
+  // Si on passe à "sold" pour la première fois, on note la date
+  if (newStatus === "sold" && existing.status !== "sold") {
+    updates.sold_at = new Date().toISOString();
+  }
+  // Si on sort de "sold" (réactivation), on nettoie la date
+  if (newStatus !== "sold" && existing.status === "sold") {
+    updates.sold_at = null;
+  }
+
+  await admin.from("properties").update(updates).eq("id", propertyId);
   revalidatePath("/", "layout");
   revalidatePath("/dashboard/owner");
+  revalidatePath(`/property/${propertyId}`);
   return { ok: true };
 }
 
