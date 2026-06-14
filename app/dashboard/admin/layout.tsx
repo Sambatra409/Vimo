@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboard, Users, Home as HomeIcon, Receipt, Settings, BadgeCheck } from "lucide-react";
+import { LayoutDashboard, Users, Home as HomeIcon, Receipt, Settings, BadgeCheck, Flag } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -24,6 +24,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <NavLink href="/dashboard/admin/users" icon={<Users className="size-4" />} label="Utilisateurs" />
             <NavLink href="/dashboard/admin/properties" icon={<HomeIcon className="size-4" />} label="Annonces" />
             <NavLink href="/dashboard/admin/verifications" icon={<BadgeCheck className="size-4" />} label="Vérifications" />
+            <NavLink href="/dashboard/admin/reports" icon={<Flag className="size-4" />} label="Signalements" />
             <NavLink href="/dashboard/admin/purchases" icon={<Receipt className="size-4" />} label="Achats jetons" />
             <NavLink href="/dashboard/admin/settings" icon={<Settings className="size-4" />} label="Paramètres" />
           </nav>
