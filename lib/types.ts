@@ -31,6 +31,8 @@ export interface PropertyFull extends PropertyListItem {
   description: string;
   address: string;
   postal_code: string | null;
+  contact_phone_1: string | null;
+  contact_phone_2: string | null;
   status: PropertyStatus;
   premium_until: string | null;
   view_count: number;
