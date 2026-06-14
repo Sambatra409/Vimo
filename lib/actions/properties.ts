@@ -499,6 +499,15 @@ export async function seedTestPropertiesAction(): Promise<
   { ok: true; created: number } | { ok: false; error: string }
 > {
   const user = await requireUser();
+
+  // Seul un admin peut créer des annonces de démo (sécurité production)
+  if (!user.roles.includes("admin")) {
+    return {
+      ok: false,
+      error: "Cette fonctionnalité est réservée aux administrateurs.",
+    };
+  }
+
   const admin = createAdminClient();
 
   // Vérifier qu'on n'a pas déjà seedé
