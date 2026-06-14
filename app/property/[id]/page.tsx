@@ -165,10 +165,13 @@ export default async function PropertyDetailPage({ params }: Props) {
             {!isOwner && (
               <ContactPanel
                 propertyId={property.id}
+                ownerId={property.owner_id}
                 initialUnlocked={unlocked}
                 isLoggedIn={!!user}
                 isFreeMode={isFreeMode}
                 unlockCost={settings?.unlock_cost ?? 1}
+                contactPhone1={property.contact_phone_1 ?? null}
+                contactPhone2={property.contact_phone_2 ?? null}
               />
             )}
 
