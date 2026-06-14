@@ -106,7 +106,7 @@ export async function forgotPasswordAction(formData: FormData): Promise<ActionRe
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo:
       (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000") +
-      "/reset-password",
+      "/auth/callback?next=/reset-password",
   });
 
   // On retourne toujours OK même si l'email n'existe pas (anti-enumération)
