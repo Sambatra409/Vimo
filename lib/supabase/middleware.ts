@@ -35,6 +35,39 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // === VÉRIFICATION BANNISSEMENT ===
+  // Si l'utilisateur est connecté, on vérifie qu'il n'est pas banni
+  if (user) {
+    try {
+      const profileRes = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=is_banned`,
+        {
+          headers: {
+            apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          cache: "no-store",
+        },
+      );
+      if (profileRes.ok) {
+        const profiles = await profileRes.json();
+        if (profiles[0]?.is_banned) {
+          // Banni → déconnexion forcée + redirect /banned
+          await supabase.auth.signOut();
+          if (request.nextUrl.pathname !== "/banned") {
+            const url = request.nextUrl.clone();
+            url.pathname = "/banned";
+            url.search = "";
+            return NextResponse.redirect(url);
+          }
+        }
+      }
+    } catch (e) {
+      // En cas d'erreur, on laisse passer (failsafe)
+      console.error("[middleware] ban check error:", e);
+    }
+  }
+
   const protectedPaths = [
     "/dashboard",
     "/favorites",
