@@ -72,10 +72,30 @@ export async function signInAction(formData: FormData): Promise<ActionResult> {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     return { ok: false, error: traduireErreur(error.message) };
+  }
+
+  // Vérifier que l'utilisateur n'est pas banni
+  if (data.user) {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("is_banned")
+      .eq("id", data.user.id)
+      .single();
+
+    if (profile?.is_banned) {
+      // Déconnexion immédiate
+      await supabase.auth.signOut();
+      return {
+        ok: false,
+        error: "Votre compte est suspendu. Contactez le support pour plus d'informations.",
+      };
+    }
   }
 
   revalidatePath("/", "layout");
