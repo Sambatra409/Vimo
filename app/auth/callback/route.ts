@@ -4,20 +4,34 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type");
   const next = searchParams.get("next") ?? "/";
 
+  // Flow PKCE moderne : ?code=xxx
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      // Succès → redirige vers la home (ou la page demandée)
       return NextResponse.redirect(`${origin}${next}`);
     }
-    console.error("[auth callback] error:", error);
+    console.error("[auth/callback] exchange error:", error);
+  }
+  // Ancien flow : ?token_hash=xxx&type=recovery
+  else if (tokenHash && type) {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.verifyOtp({
+      type: type as any,
+      token_hash: tokenHash,
+    });
+    if (!error) {
+      return NextResponse.redirect(`${origin}${next}`);
+    }
+    console.error("[auth/callback] verifyOtp error:", error);
   }
 
-  // Échec → page de login avec message
+  // Erreur : redirige vers login avec message
   return NextResponse.redirect(
-    `${origin}/login?error=Le lien a expir%C3%A9 ou est invalide`,
+    `${origin}/login?error=${encodeURIComponent("Le lien a expiré ou est invalide. Redemande un email.")}`,
   );
 }
