@@ -22,6 +22,7 @@ export default async function OwnerDashboardPage() {
 
   const list = properties ?? [];
   const activeCount = list.filter((p) => p.status === "active").length;
+  const isAdmin = user.roles.includes("admin");
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-12">
@@ -49,14 +50,15 @@ export default async function OwnerDashboardPage() {
           <Plus className="size-4" />
           Nouvelle annonce
         </Link>
-        {list.length === 0 && <SeedButton />}
+        {/* Bouton seed réservé aux admins uniquement */}
+        {isAdmin && list.length === 0 && <SeedButton />}
       </div>
 
       {/* Liste des annonces */}
       {list.length === 0 ? (
         <div className="text-center py-20 border border-dashed border-border rounded-2xl bg-card max-w-2xl mx-auto">
           <p className="text-muted-foreground mb-4">
-            Pas encore d'annonce ? Vous pouvez en créer une vraie ou tester avec des annonces fictives.
+            Pas encore d'annonce. Cliquez sur "Nouvelle annonce" pour commencer.
           </p>
         </div>
       ) : (
