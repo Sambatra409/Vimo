@@ -23,7 +23,9 @@ interface PropertyInput {
   address: string;
   city: string;
   postal_code: string | null;
-  photos: string[]; // URLs déjà uploadées
+  contact_phone_1: string | null;
+  contact_phone_2: string | null;
+  photos: string[];
   status?: PropertyStatus;
 }
 
@@ -67,6 +69,10 @@ function validatePropertyInput(
   if (input.photos.length > 5)
     return { ok: false, error: "Maximum 5 photos autorisées." };
 
+  // Numéro principal obligatoire
+  if (!input.contact_phone_1 || input.contact_phone_1.trim().length < 8)
+    return { ok: false, error: "Numéro de contact principal requis (8 chiffres minimum)." };
+
   return {
     ok: true,
     data: {
@@ -80,6 +86,8 @@ function validatePropertyInput(
       address: input.address.trim(),
       city: input.city.trim(),
       postal_code: input.postal_code?.trim() || null,
+      contact_phone_1: input.contact_phone_1.trim(),
+      contact_phone_2: input.contact_phone_2?.trim() || null,
       photos: input.photos,
       status: input.status ?? "active",
     },
@@ -114,6 +122,8 @@ export async function createPropertyAction(
       address: valid.data.address,
       city: valid.data.city,
       postal_code: valid.data.postal_code,
+      contact_phone_1: valid.data.contact_phone_1,
+      contact_phone_2: valid.data.contact_phone_2,
       status: valid.data.status,
     })
     .select("id")
@@ -175,8 +185,9 @@ export async function updatePropertyAction(
       address: valid.data.address,
       city: valid.data.city,
       postal_code: valid.data.postal_code,
+      contact_phone_1: valid.data.contact_phone_1,
+      contact_phone_2: valid.data.contact_phone_2,
       status: valid.data.status,
-      // Modification importante => repasser en non-vérifié pour re-validation
       is_verified: false,
     })
     .eq("id", propertyId);
