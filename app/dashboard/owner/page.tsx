@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatAr, titleCase, propertyTypeLabel } from "@/lib/format";
 import { SeedButton } from "./seed-button";
+import { PropertyActions } from "./property-actions";
 
 export default async function OwnerDashboardPage() {
   const user = await getCurrentUser();
@@ -99,25 +100,33 @@ export default async function OwnerDashboardPage() {
                       </span>
                     )}
                   </p>
-                  <div className="flex gap-2 text-xs">
-                    <Link
-                      href={`/property/${p.id}`}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md hover:bg-muted text-foreground"
-                    >
-                      <Eye className="size-3" /> Voir
-                    </Link>
-                    <Link
-                      href={`/property/${p.id}/edit`}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md hover:bg-muted text-foreground"
-                    >
-                      <Pencil className="size-3" /> Modifier
-                    </Link>
-                    <Link
-                      href={`/property/${p.id}/stats`}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md hover:bg-muted text-foreground"
-                    >
-                      <BarChart3 className="size-3" /> Stats
-                    </Link>
+                  <div className="flex gap-2 text-xs items-center justify-between">
+                    <div className="flex gap-1">
+                      <Link
+                        href={`/property/${p.id}`}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md hover:bg-muted text-foreground"
+                      >
+                        <Eye className="size-3" /> Voir
+                      </Link>
+                      <Link
+                        href={`/property/${p.id}/edit`}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md hover:bg-muted text-foreground"
+                      >
+                        <Pencil className="size-3" /> Modifier
+                      </Link>
+                      <Link
+                        href={`/property/${p.id}/stats`}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md hover:bg-muted text-foreground"
+                      >
+                        <BarChart3 className="size-3" /> Stats
+                      </Link>
+                    </div>
+                    <PropertyActions
+                      propertyId={p.id}
+                      propertyTitle={p.title}
+                      currentStatus={p.status}
+                      listingType={p.listing_type}
+                    />
                   </div>
                 </div>
               </article>
@@ -135,6 +144,7 @@ function StatusBadge({ status }: { status: string }) {
     draft: { label: "Brouillon", cls: "bg-muted text-muted-foreground" },
     paused: { label: "Pausée", cls: "bg-premium/20 text-premium-foreground" },
     archived: { label: "Archivée", cls: "bg-destructive/15 text-destructive" },
+    sold: { label: "Soldée", cls: "bg-primary/15 text-primary" },
   };
   const info = map[status] ?? map.draft;
   return (
