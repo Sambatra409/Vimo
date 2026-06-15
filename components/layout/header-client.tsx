@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Menu,
   X,
@@ -35,7 +36,19 @@ interface Props {
 
 export function HeaderClient({ user }: Props) {
   const [open, setOpen] = useState(false);
+  const [signingOut, startSignOut] = useTransition();
+  const router = useRouter();
   const close = () => setOpen(false);
+
+  // Handler de déconnexion qui marche sur Android (ferme le drawer APRÈS l'action)
+  const handleSignOut = () => {
+    startSignOut(async () => {
+      await signOutAction();
+      setOpen(false);
+      router.push("/");
+      router.refresh();
+    });
+  };
 
   const isAdmin = user?.roles.includes("admin") ?? false;
   const isOwner = user?.roles.includes("proprietaire") ?? false;
@@ -118,14 +131,14 @@ export function HeaderClient({ user }: Props) {
                 </span>
               </Link>
               {/* Bouton déconnexion */}
-              <form action={signOutAction}>
-                <button
-                  type="submit"
-                  className="text-sm font-medium px-4 py-2 hover:bg-muted rounded-lg transition-colors"
-                >
-                  Déconnexion
-                </button>
-              </form>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={signingOut}
+                className="text-sm font-medium px-4 py-2 hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
+              >
+                {signingOut ? "..." : "Déconnexion"}
+              </button>
             </>
           ) : (
             <>
@@ -238,13 +251,14 @@ export function HeaderClient({ user }: Props) {
 
                 <div className="my-2 h-px bg-border" />
 
-                <form action={signOutAction}>
+                <form action={signOutAction} onSubmit={(e) => { e.preventDefault(); handleSignOut(); }}>
                   <button
-                    type="submit"
-                    onClick={close}
-                    className="w-full text-left py-2.5 px-3 rounded-md hover:bg-muted text-destructive flex items-center gap-3"
+                    type="button"
+                    onClick={handleSignOut}
+                    disabled={signingOut}
+                    className="w-full text-left py-2.5 px-3 rounded-md hover:bg-muted text-destructive flex items-center gap-3 disabled:opacity-50"
                   >
-                    <LogOut className="size-4" /> Déconnexion
+                    <LogOut className="size-4" /> {signingOut ? "Déconnexion..." : "Déconnexion"}
                   </button>
                 </form>
               </>
