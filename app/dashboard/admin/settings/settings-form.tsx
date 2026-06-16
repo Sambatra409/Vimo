@@ -2,13 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Save, Sparkles, Coins, Trash2 } from "lucide-react";
+import { Save, Sparkles, Coins, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { updateSettingsAction, updatePackAction } from "@/lib/actions/admin";
+import { updateSettingsAction, updatePackAction, createPackAction, deletePackAction } from "@/lib/actions/admin";
 import { formatAr } from "@/lib/format";
 
 interface Settings {
   unlock_cost: number;
+  unlock_cost_rent: number | null;
+  unlock_cost_sale: number | null;
   verification_cost: number;
   boost_cost: number;
   boost_duration_days: number;
@@ -61,8 +63,22 @@ export function SettingsForm({
       {/* === SECTION 1 — TARIFS ET RÈGLES === */}
       <form onSubmit={handleGlobal} className="space-y-6">
         <Section title="Tarifs en jetons" icon={<Coins className="size-4" />}>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Field label="Déblocage contact">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <Field label="Déblocage LOCATION">
+              <NumberInput
+                name="unlock_cost_rent"
+                defaultValue={settings.unlock_cost_rent ?? settings.unlock_cost}
+                min={0}
+              />
+            </Field>
+            <Field label="Déblocage VENTE">
+              <NumberInput
+                name="unlock_cost_sale"
+                defaultValue={settings.unlock_cost_sale ?? settings.unlock_cost}
+                min={0}
+              />
+            </Field>
+            <Field label="Déblocage (défaut)">
               <NumberInput
                 name="unlock_cost"
                 defaultValue={settings.unlock_cost}
@@ -91,6 +107,9 @@ export function SettingsForm({
               />
             </Field>
           </div>
+          <p className="text-[11px] text-muted-foreground mt-3">
+            💡 Le coût de déblocage est différent selon que l&apos;annonce est en location ou en vente. Le &quot;défaut&quot; sert de fallback.
+          </p>
         </Section>
 
         <Section
@@ -188,11 +207,12 @@ export function SettingsForm({
       </form>
 
       {/* === SECTION 2 — PACKS DE JETONS === */}
-      <Section title="Packs de jetons" subtitle="Modifie les prix de chaque pack proposé sur la page /tokens.">
+      <Section title="Packs de jetons" subtitle="Modifie le nombre de jetons, le prix et l'étiquette de chaque pack. Tu peux aussi en ajouter ou en supprimer.">
         <div className="space-y-3">
           {packs.map((p) => (
             <PackEditor key={p.id} pack={p} />
           ))}
+          <NewPackForm />
         </div>
       </Section>
     </div>
@@ -202,6 +222,7 @@ export function SettingsForm({
 function PackEditor({ pack }: { pack: Pack }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [deleting, startDelete] = useTransition();
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -210,21 +231,33 @@ function PackEditor({ pack }: { pack: Pack }) {
       const res = await updatePackAction(pack.id, fd);
       if (!res.ok) toast.error(res.error);
       else {
-        toast.success(`Pack ${pack.size} mis à jour`);
+        toast.success(`Pack mis à jour`);
         router.refresh();
       }
+    });
+  };
+
+  const handleDelete = () => {
+    if (!confirm(`Supprimer définitivement le pack "${pack.size} jetons" ?\n\nCela ne supprimera PAS les achats déjà effectués.`)) return;
+    startDelete(async () => {
+      const res = await deletePackAction(pack.id);
+      if (!res.ok) {
+        toast.error("error" in res ? res.error : "Erreur");
+        return;
+      }
+      toast.success("Pack supprimé");
+      router.refresh();
     });
   };
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-background border border-border rounded-xl p-3 grid grid-cols-2 md:grid-cols-6 gap-2 items-end"
+      className="bg-background border border-border rounded-xl p-3 grid grid-cols-2 md:grid-cols-7 gap-2 items-end"
     >
-      <div className="font-mono text-2xl font-bold text-primary md:col-span-1">
-        {pack.size}
-        <span className="text-xs text-muted-foreground font-sans ml-1">jeton{pack.size > 1 ? "s" : ""}</span>
-      </div>
+      <Field label="Nb jetons">
+        <NumberInput name="size" defaultValue={pack.size} min={1} />
+      </Field>
       <Field label="Prix (Ar)">
         <NumberInput name="price_ar" defaultValue={pack.price_ar} min={1} />
       </Field>
@@ -240,10 +273,88 @@ function PackEditor({ pack }: { pack: Pack }) {
       </label>
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || deleting}
         className="min-h-10 px-3 bg-primary text-primary-foreground rounded-md text-xs font-semibold uppercase tracking-wider hover:opacity-90 disabled:opacity-50"
       >
         {pending ? "…" : "Enregistrer"}
+      </button>
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={pending || deleting}
+        title="Supprimer ce pack"
+        className="min-h-10 px-3 bg-destructive/10 text-destructive rounded-md text-xs font-semibold flex items-center justify-center gap-1 hover:bg-destructive/20 disabled:opacity-50"
+      >
+        <Trash2 className="size-3.5" />
+      </button>
+    </form>
+  );
+}
+
+function NewPackForm() {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const res = await createPackAction(fd);
+      if (!res.ok) {
+        toast.error("error" in res ? res.error : "Erreur");
+        return;
+      }
+      toast.success("Pack créé");
+      (e.target as HTMLFormElement).reset();
+      setOpen(false);
+      router.refresh();
+    });
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full border-2 border-dashed border-border rounded-xl p-4 text-sm text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 flex items-center justify-center gap-2 transition-colors"
+      >
+        <Plus className="size-4" />
+        Ajouter un nouveau pack
+      </button>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="bg-primary/5 border-2 border-primary/30 rounded-xl p-3 grid grid-cols-2 md:grid-cols-6 gap-2 items-end"
+    >
+      <Field label="Nb jetons *">
+        <NumberInput name="size" defaultValue={10} min={1} required />
+      </Field>
+      <Field label="Prix (Ar) *">
+        <NumberInput name="price_ar" defaultValue={45000} min={1} required />
+      </Field>
+      <Field label="Label">
+        <TextInput name="label" placeholder="Populaire" />
+      </Field>
+      <Field label="Badge">
+        <TextInput name="badge" placeholder="-20%" />
+      </Field>
+      <button
+        type="submit"
+        disabled={pending}
+        className="min-h-10 px-3 bg-primary text-primary-foreground rounded-md text-xs font-semibold uppercase tracking-wider hover:opacity-90 disabled:opacity-50"
+      >
+        {pending ? "…" : "Créer"}
+      </button>
+      <button
+        type="button"
+        onClick={() => setOpen(false)}
+        className="min-h-10 px-3 bg-muted text-muted-foreground rounded-md text-xs hover:bg-card"
+      >
+        Annuler
       </button>
     </form>
   );
