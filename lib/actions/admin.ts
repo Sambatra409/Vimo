@@ -273,6 +273,8 @@ export async function updateSettingsAction(formData: FormData) {
 
   const updates: any = {
     unlock_cost: Number(formData.get("unlock_cost")) || 1,
+    unlock_cost_rent: Number(formData.get("unlock_cost_rent")) || 1,
+    unlock_cost_sale: Number(formData.get("unlock_cost_sale")) || 1,
     verification_cost: Number(formData.get("verification_cost")) || 10,
     boost_cost: Number(formData.get("boost_cost")) || 5,
     boost_duration_days: Number(formData.get("boost_duration_days")) || 7,
@@ -314,14 +316,90 @@ export async function updatePackAction(packId: string, formData: FormData) {
   await requireRole("admin");
   const admin = createAdminClient();
   const price_ar = Number(formData.get("price_ar"));
+  const size = Number(formData.get("size"));
   const label = String(formData.get("label") ?? "").trim() || null;
   const badge = String(formData.get("badge") ?? "").trim() || null;
   const is_active = formData.get("is_active") === "on";
+
   if (!price_ar || price_ar <= 0) return { ok: false, error: "Prix invalide." };
-  await admin
+  if (!size || size <= 0 || !Number.isInteger(size))
+    return { ok: false, error: "Nombre de jetons invalide (doit être un entier > 0)." };
+  if (size > 10000)
+    return { ok: false, error: "Maximum 10 000 jetons par pack." };
+
+  // Vérifier qu'aucun autre pack n'a déjà cette taille
+  const { data: existing } = await admin
     .from("token_packs")
-    .update({ price_ar, label, badge, is_active })
+    .select("id")
+    .eq("size", size)
+    .neq("id", packId)
+    .maybeSingle();
+  if (existing) return { ok: false, error: `Un autre pack a déjà ${size} jetons. Choisissez une taille différente.` };
+
+  const { error } = await admin
+    .from("token_packs")
+    .update({ price_ar, size, label, badge, is_active })
     .eq("id", packId);
+  if (error) {
+    console.error("[updatePackAction] error:", error);
+    return { ok: false, error: "Erreur technique." };
+  }
+  revalidatePath("/dashboard/admin/settings");
+  revalidatePath("/tokens");
+  return { ok: true };
+}
+
+// Créer un nouveau pack
+export async function createPackAction(formData: FormData) {
+  await requireRole("admin");
+  const admin = createAdminClient();
+  const price_ar = Number(formData.get("price_ar"));
+  const size = Number(formData.get("size"));
+  const label = String(formData.get("label") ?? "").trim() || null;
+  const badge = String(formData.get("badge") ?? "").trim() || null;
+
+  if (!price_ar || price_ar <= 0) return { ok: false, error: "Prix invalide." };
+  if (!size || size <= 0 || !Number.isInteger(size))
+    return { ok: false, error: "Nombre de jetons invalide." };
+
+  // Vérifier l'unicité de size
+  const { data: existing } = await admin
+    .from("token_packs")
+    .select("id")
+    .eq("size", size)
+    .maybeSingle();
+  if (existing) return { ok: false, error: `Un pack avec ${size} jetons existe déjà.` };
+
+  // Calculer le display_order = max actuel + 1
+  const { data: maxOrder } = await admin
+    .from("token_packs")
+    .select("display_order")
+    .order("display_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await admin.from("token_packs").insert({
+    size,
+    price_ar,
+    label,
+    badge,
+    display_order: (maxOrder?.display_order ?? 0) + 1,
+    is_active: true,
+  });
+  if (error) {
+    console.error("[createPackAction] error:", error);
+    return { ok: false, error: "Erreur technique." };
+  }
+  revalidatePath("/dashboard/admin/settings");
+  revalidatePath("/tokens");
+  return { ok: true };
+}
+
+// Supprimer un pack
+export async function deletePackAction(packId: string) {
+  await requireRole("admin");
+  const admin = createAdminClient();
+  await admin.from("token_packs").delete().eq("id", packId);
   revalidatePath("/dashboard/admin/settings");
   revalidatePath("/tokens");
   return { ok: true };
@@ -406,5 +484,35 @@ export async function adminToggleVerifiedAction(propertyId: string, verified: bo
     .eq("id", propertyId);
   revalidatePath("/", "layout");
   revalidatePath("/dashboard/admin/properties");
+  return { ok: true };
+}
+
+// Changer le statut d'une annonce depuis l'admin (active, paused, sold)
+export async function adminChangeStatusAction(
+  propertyId: string,
+  newStatus: "active" | "paused" | "sold",
+) {
+  await requireRole("admin");
+  const admin = createAdminClient();
+
+  const { data: current } = await admin
+    .from("properties")
+    .select("status")
+    .eq("id", propertyId)
+    .single();
+  if (!current) return { ok: false, error: "Annonce introuvable." };
+
+  const updates: any = { status: newStatus };
+  if (newStatus === "sold" && current.status !== "sold") {
+    updates.sold_at = new Date().toISOString();
+  }
+  if (newStatus !== "sold" && current.status === "sold") {
+    updates.sold_at = null;
+  }
+
+  await admin.from("properties").update(updates).eq("id", propertyId);
+  revalidatePath("/", "layout");
+  revalidatePath("/dashboard/admin/properties");
+  revalidatePath(`/property/${propertyId}`);
   return { ok: true };
 }
