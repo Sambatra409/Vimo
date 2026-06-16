@@ -136,7 +136,7 @@ export async function unlockContactAction(propertyId: string): Promise<
   // 2. Vérifier que l'annonce existe et n'appartient pas à l'utilisateur
   const { data: property } = await admin
     .from("properties")
-    .select("id, owner_id, status")
+    .select("id, owner_id, status, listing_type")
     .eq("id", propertyId)
     .single();
 
@@ -160,10 +160,10 @@ export async function unlockContactAction(propertyId: string): Promise<
     return { ok: true, owner, alreadyUnlocked: true };
   }
 
-  // 4. Lire les paramètres globaux : mode gratuit + coût + free unlocks par jour
+  // 4. Lire les paramètres globaux (coûts différenciés rent/sale)
   const { data: settings } = await admin
     .from("site_settings")
-    .select("unlock_cost, free_mode_until, free_unlocks_per_day")
+    .select("unlock_cost, unlock_cost_rent, unlock_cost_sale, free_mode_until, free_unlocks_per_day")
     .eq("id", 1)
     .single();
 
@@ -187,7 +187,14 @@ export async function unlockContactAction(propertyId: string): Promise<
   const hasFreeUnlockLeft =
     !isFreeMode && freeUnlocksPerDay > 0 && freeUnlocksUsedToday < freeUnlocksPerDay;
 
-  const cost = isFreeMode || hasFreeUnlockLeft ? 0 : (settings?.unlock_cost ?? 1);
+  // Choisir le coût selon le type d'annonce (rent ou sale)
+  const specificCost = property.listing_type === "sale"
+    ? settings?.unlock_cost_sale
+    : settings?.unlock_cost_rent;
+  const defaultCost = settings?.unlock_cost ?? 1;
+  const baseCost = specificCost ?? defaultCost;
+
+  const cost = isFreeMode || hasFreeUnlockLeft ? 0 : baseCost;
 
   // 5. Si pas gratuit : vérifier les jetons + débiter
   if (cost > 0) {
