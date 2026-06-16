@@ -185,7 +185,11 @@ export default async function PropertyDetailPage({ params }: Props) {
                 initialUnlocked={unlocked}
                 isLoggedIn={!!user}
                 isFreeMode={isFreeMode}
-                unlockCost={settings?.unlock_cost ?? 1}
+                unlockCost={
+                  (property.listing_type === "sale"
+                    ? settings?.unlock_cost_sale
+                    : settings?.unlock_cost_rent) ?? settings?.unlock_cost ?? 1
+                }
                 contactPhone1={property.contact_phone_1 ?? null}
                 contactPhone2={property.contact_phone_2 ?? null}
               />
@@ -274,7 +278,7 @@ async function fetchSettings() {
   const admin = createAdminClient();
   const { data } = await admin
     .from("site_settings")
-    .select("unlock_cost, verification_cost, free_mode_until")
+    .select("unlock_cost, unlock_cost_rent, unlock_cost_sale, verification_cost, free_mode_until")
     .eq("id", 1)
     .single();
   return data;
