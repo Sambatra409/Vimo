@@ -11,6 +11,10 @@ interface Settings {
   unlock_cost: number;
   unlock_cost_rent: number | null;
   unlock_cost_sale: number | null;
+  unlock_cost_rent_verified: number | null;
+  unlock_cost_rent_unverified: number | null;
+  unlock_cost_sale_verified: number | null;
+  unlock_cost_sale_unverified: number | null;
   verification_cost: number;
   boost_cost: number;
   boost_duration_days: number;
@@ -62,22 +66,63 @@ export function SettingsForm({
     <div className="space-y-6">
       {/* === SECTION 1 — TARIFS ET RÈGLES === */}
       <form onSubmit={handleGlobal} className="space-y-6">
-        <Section title="Tarifs en jetons" icon={<Coins className="size-4" />}>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <Field label="Déblocage LOCATION">
+        <Section title="Tarifs déblocage par type d'annonce" icon={<Coins className="size-4" />}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <div></div>
+            <div className="text-center">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-verified">
+                ✓ Vérifiée
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
+                Non vérifiée
+              </p>
+            </div>
+
+            <div className="md:text-right md:pr-2">
+              <p className="text-xs font-semibold uppercase tracking-wider">📦 Location</p>
+            </div>
+            <Field label="">
               <NumberInput
-                name="unlock_cost_rent"
-                defaultValue={settings.unlock_cost_rent ?? settings.unlock_cost}
+                name="unlock_cost_rent_verified"
+                defaultValue={settings.unlock_cost_rent_verified ?? settings.unlock_cost_rent ?? settings.unlock_cost}
                 min={0}
               />
             </Field>
-            <Field label="Déblocage VENTE">
+            <Field label="">
               <NumberInput
-                name="unlock_cost_sale"
-                defaultValue={settings.unlock_cost_sale ?? settings.unlock_cost}
+                name="unlock_cost_rent_unverified"
+                defaultValue={settings.unlock_cost_rent_unverified ?? settings.unlock_cost_rent ?? settings.unlock_cost}
                 min={0}
               />
             </Field>
+
+            <div className="md:text-right md:pr-2">
+              <p className="text-xs font-semibold uppercase tracking-wider">🏠 Vente</p>
+            </div>
+            <Field label="">
+              <NumberInput
+                name="unlock_cost_sale_verified"
+                defaultValue={settings.unlock_cost_sale_verified ?? settings.unlock_cost_sale ?? settings.unlock_cost}
+                min={0}
+              />
+            </Field>
+            <Field label="">
+              <NumberInput
+                name="unlock_cost_sale_unverified"
+                defaultValue={settings.unlock_cost_sale_unverified ?? settings.unlock_cost_sale ?? settings.unlock_cost}
+                min={0}
+              />
+            </Field>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-3">
+            💡 Le coût varie selon que l&apos;annonce est en location ou en vente, et selon qu&apos;elle est vérifiée ✓ ou non. Les annonces vérifiées peuvent justifier un coût plus élevé car elles sont plus fiables.
+          </p>
+        </Section>
+
+        <Section title="Autres tarifs" icon={<Coins className="size-4" />}>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Field label="Déblocage (défaut)">
               <NumberInput
                 name="unlock_cost"
@@ -108,7 +153,7 @@ export function SettingsForm({
             </Field>
           </div>
           <p className="text-[11px] text-muted-foreground mt-3">
-            💡 Le coût de déblocage est différent selon que l&apos;annonce est en location ou en vente. Le &quot;défaut&quot; sert de fallback.
+            💡 Le « Déblocage (défaut) » sert de filet de sécurité si les 4 tarifs ci-dessus sont vides.
           </p>
         </Section>
 
