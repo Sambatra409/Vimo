@@ -136,7 +136,7 @@ export async function unlockContactAction(propertyId: string): Promise<
   // 2. Vérifier que l'annonce existe et n'appartient pas à l'utilisateur
   const { data: property } = await admin
     .from("properties")
-    .select("id, owner_id, status, listing_type")
+    .select("id, owner_id, status, listing_type, is_verified")
     .eq("id", propertyId)
     .single();
 
@@ -160,10 +160,15 @@ export async function unlockContactAction(propertyId: string): Promise<
     return { ok: true, owner, alreadyUnlocked: true };
   }
 
-  // 4. Lire les paramètres globaux (coûts différenciés rent/sale)
+  // 4. Lire les paramètres globaux (matrice de coûts 2×2 + fallbacks)
   const { data: settings } = await admin
     .from("site_settings")
-    .select("unlock_cost, unlock_cost_rent, unlock_cost_sale, free_mode_until, free_unlocks_per_day")
+    .select(
+      "unlock_cost, unlock_cost_rent, unlock_cost_sale, " +
+      "unlock_cost_rent_verified, unlock_cost_rent_unverified, " +
+      "unlock_cost_sale_verified, unlock_cost_sale_unverified, " +
+      "free_mode_until, free_unlocks_per_day"
+    )
     .eq("id", 1)
     .single();
 
@@ -187,12 +192,19 @@ export async function unlockContactAction(propertyId: string): Promise<
   const hasFreeUnlockLeft =
     !isFreeMode && freeUnlocksPerDay > 0 && freeUnlocksUsedToday < freeUnlocksPerDay;
 
-  // Choisir le coût selon le type d'annonce (rent ou sale)
-  const specificCost = property.listing_type === "sale"
-    ? settings?.unlock_cost_sale
-    : settings?.unlock_cost_rent;
+  // Choisir le coût selon (type d'annonce) × (vérifié ou non), avec fallbacks
+  const isSale = property.listing_type === "sale";
+  const isVerified = property.is_verified === true;
+
+  let specificCost: number | null | undefined = null;
+  if (isSale && isVerified) specificCost = settings?.unlock_cost_sale_verified;
+  else if (isSale && !isVerified) specificCost = settings?.unlock_cost_sale_unverified;
+  else if (!isSale && isVerified) specificCost = settings?.unlock_cost_rent_verified;
+  else specificCost = settings?.unlock_cost_rent_unverified;
+
+  const fallbackCost = isSale ? settings?.unlock_cost_sale : settings?.unlock_cost_rent;
   const defaultCost = settings?.unlock_cost ?? 1;
-  const baseCost = specificCost ?? defaultCost;
+  const baseCost = specificCost ?? fallbackCost ?? defaultCost;
 
   const cost = isFreeMode || hasFreeUnlockLeft ? 0 : baseCost;
 
