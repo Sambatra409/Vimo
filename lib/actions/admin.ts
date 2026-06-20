@@ -273,8 +273,12 @@ export async function updateSettingsAction(formData: FormData) {
 
   const updates: any = {
     unlock_cost: Number(formData.get("unlock_cost")) || 1,
-    unlock_cost_rent: Number(formData.get("unlock_cost_rent")) || 1,
-    unlock_cost_sale: Number(formData.get("unlock_cost_sale")) || 1,
+    unlock_cost_rent: Number(formData.get("unlock_cost_rent")) || null,
+    unlock_cost_sale: Number(formData.get("unlock_cost_sale")) || null,
+    unlock_cost_rent_verified: Number(formData.get("unlock_cost_rent_verified")) || null,
+    unlock_cost_rent_unverified: Number(formData.get("unlock_cost_rent_unverified")) || null,
+    unlock_cost_sale_verified: Number(formData.get("unlock_cost_sale_verified")) || null,
+    unlock_cost_sale_unverified: Number(formData.get("unlock_cost_sale_unverified")) || null,
     verification_cost: Number(formData.get("verification_cost")) || 10,
     boost_cost: Number(formData.get("boost_cost")) || 5,
     boost_duration_days: Number(formData.get("boost_duration_days")) || 7,
