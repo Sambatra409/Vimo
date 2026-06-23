@@ -1,69 +1,14 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
+import { createServerSupabase } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-interface ActionResult {
-  ok: boolean;
-  error?: string;
-}
-
-// ----------------------------------------------------------------------------
-// SIGNUP
-// ----------------------------------------------------------------------------
-export async function signUpAction(formData: FormData): Promise<ActionResult> {
-  const fullName = String(formData.get("fullName") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const phone = String(formData.get("phone") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
-  const role = String(formData.get("role") ?? "locataire");
-  const acceptCgu = formData.get("acceptCgu") === "on";
-
-  // Validation côté serveur (ne JAMAIS faire confiance au client)
-  if (!fullName || fullName.length < 2) {
-    return { ok: false, error: "Le nom complet est requis." };
-  }
-  if (!email || !email.includes("@")) {
-    return { ok: false, error: "Email invalide." };
-  }
-  if (!password || password.length < 6) {
-    return { ok: false, error: "Le mot de passe doit faire au moins 6 caractères." };
-  }
-  if (!["locataire", "proprietaire"].includes(role)) {
-    return { ok: false, error: "Rôle invalide." };
-  }
-  if (!acceptCgu) {
-    return { ok: false, error: "Vous devez accepter les CGU." };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      // Important : ces données passent dans le trigger handle_new_user()
-      // qui les transfère dans profiles + user_roles
-      data: {
-        full_name: fullName,
-        phone: phone || null,
-        role,
-        cgu_accepted_at: new Date().toISOString(),
-      },
-    },
-  });
-
-  if (error) {
-    return { ok: false, error: traduireErreur(error.message) };
-  }
-
-  return { ok: true };
-}
-
-// ----------------------------------------------------------------------------
-// SIGN IN
-// ----------------------------------------------------------------------------
-export async function signInAction(formData: FormData): Promise<ActionResult> {
+// ============================================================================
+// CONNEXION
+// ============================================================================
+export async function signInAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
@@ -71,103 +16,166 @@ export async function signInAction(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: "Email et mot de passe requis." };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const supabase = await createServerSupabase();
 
-  if (error) {
-    return { ok: false, error: traduireErreur(error.message) };
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error || !data.user) {
+    return { ok: false, error: "Email ou mot de passe incorrect." };
   }
 
-  // Vérifier que l'utilisateur n'est pas banni
-  if (data.user) {
-    const { createAdminClient } = await import("@/lib/supabase/admin");
-    const admin = createAdminClient();
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("is_banned")
-      .eq("id", data.user.id)
-      .single();
+  // Vérifier si l'utilisateur est banni
+  const admin = createAdminClient();
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("is_banned, ban_reason")
+    .eq("id", data.user.id)
+    .single();
 
-    if (profile?.is_banned) {
-      // Déconnexion immédiate
-      await supabase.auth.signOut();
-      return {
-        ok: false,
-        error: "Votre compte est suspendu. Contactez le support pour plus d'informations.",
-      };
-    }
+  if (profile?.is_banned) {
+    await supabase.auth.signOut();
+    return {
+      ok: false,
+      error: `Votre compte a été suspendu. Motif : ${profile.ban_reason || "Violation des CGU"}. Contactez le support.`,
+    };
   }
 
   revalidatePath("/", "layout");
   return { ok: true };
 }
 
-// ----------------------------------------------------------------------------
-// SIGN OUT
-// ----------------------------------------------------------------------------
+// ============================================================================
+// INSCRIPTION
+// ============================================================================
+export async function signUpAction(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const fullName = String(formData.get("full_name") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const role = String(formData.get("role") ?? "locataire").trim();
+
+  if (!email || !password || !fullName) {
+    return { ok: false, error: "Tous les champs obligatoires doivent être remplis." };
+  }
+
+  if (password.length < 6) {
+    return { ok: false, error: "Le mot de passe doit faire au moins 6 caractères." };
+  }
+
+  if (!["locataire", "proprietaire"].includes(role)) {
+    return { ok: false, error: "Rôle invalide." };
+  }
+
+  const supabase = await createServerSupabase();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://vohitra-imo.com";
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${siteUrl}/auth/callback?next=/dashboard`,
+      data: {
+        full_name: fullName,
+        phone: phone || null,
+        role,
+      },
+    },
+  });
+
+  if (error) {
+    if (error.message.includes("already registered")) {
+      return { ok: false, error: "Un compte existe déjà avec cet email." };
+    }
+    return { ok: false, error: error.message };
+  }
+
+  if (!data.user) {
+    return { ok: false, error: "Erreur lors de la création du compte." };
+  }
+
+  const admin = createAdminClient();
+  await admin.from("profiles").upsert({
+    id: data.user.id,
+    full_name: fullName,
+    email,
+    phone: phone || null,
+    roles: [role],
+    tokens_balance: 0,
+  });
+
+  return { ok: true, needsConfirmation: !data.session };
+}
+
+// ============================================================================
+// DÉCONNEXION
+// ============================================================================
 export async function signOutAction() {
-  const supabase = await createClient();
+  const supabase = await createServerSupabase();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
   redirect("/");
 }
 
-// ----------------------------------------------------------------------------
-// FORGOT PASSWORD (envoie un email avec lien de réinitialisation)
-// ----------------------------------------------------------------------------
-export async function forgotPasswordAction(formData: FormData): Promise<ActionResult> {
+// ============================================================================
+// MOT DE PASSE OUBLIÉ — envoi du mail
+// ============================================================================
+export async function forgotPasswordAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
 
-  if (!email || !email.includes("@")) {
-    return { ok: false, error: "Email invalide." };
+  if (!email) {
+    return { ok: false, error: "Email requis." };
   }
 
-  const supabase = await createClient();
+  const supabase = await createServerSupabase();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://vohitra-imo.com";
+
+  // FIX : redirige vers /auth/callback qui ensuite redirige vers /reset-password
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo:
-      (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000") +
-      "/auth/callback?next=/reset-password",
+    redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
   });
 
-  // On retourne toujours OK même si l'email n'existe pas (anti-enumération)
   if (error) {
-    console.error("[forgotPassword]", error.message);
+    console.error("[forgotPassword] error:", error);
+    return { ok: false, error: "Erreur lors de l'envoi. Vérifiez votre email." };
   }
-  return { ok: true };
+
+  return {
+    ok: true,
+    message: "Si un compte existe pour cet email, un lien de réinitialisation a été envoyé.",
+  };
 }
 
-// ----------------------------------------------------------------------------
-// RESET PASSWORD (après avoir cliqué sur le lien dans l'email)
-// ----------------------------------------------------------------------------
-export async function resetPasswordAction(
-  formData: FormData,
-): Promise<ActionResult> {
-  const password = String(formData.get("password") ?? "");
+// ============================================================================
+// CHANGER LE MOT DE PASSE (utilisateur connecté)
+// ============================================================================
+export async function updatePasswordAction(formData: FormData) {
+  const newPassword = String(formData.get("new_password") ?? "");
+  const confirmPassword = String(formData.get("confirm_password") ?? "");
 
-  if (!password || password.length < 6) {
+  if (!newPassword || newPassword.length < 6) {
     return { ok: false, error: "Le mot de passe doit faire au moins 6 caractères." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.updateUser({ password });
+  if (newPassword !== confirmPassword) {
+    return { ok: false, error: "Les mots de passe ne correspondent pas." };
+  }
+
+  const supabase = await createServerSupabase();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Session expirée. Refaites une demande de réinitialisation." };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
 
   if (error) {
-    return { ok: false, error: traduireErreur(error.message) };
+    console.error("[updatePassword] error:", error);
+    return { ok: false, error: "Erreur lors de la mise à jour. Réessayez." };
   }
 
   return { ok: true };
-}
-
-// ----------------------------------------------------------------------------
-// Helpers
-// ----------------------------------------------------------------------------
-function traduireErreur(msg: string): string {
-  const map: Record<string, string> = {
-    "Invalid login credentials": "Email ou mot de passe incorrect.",
-    "User already registered": "Un compte existe déjà avec cet email.",
-    "Email rate limit exceeded": "Trop de tentatives. Réessayez dans quelques minutes.",
-    "Password should be at least 6 characters":
-      "Le mot de passe doit faire au moins 6 caractères.",
-  };
-  return map[msg] ?? msg;
 }
