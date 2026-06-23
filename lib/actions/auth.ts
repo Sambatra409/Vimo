@@ -127,8 +127,8 @@ export async function forgotPasswordAction(formData: FormData) {
 }
 
 export async function updatePasswordAction(formData: FormData) {
-  const newPassword = String(formData.get("new_password") ?? "");
-  const confirmPassword = String(formData.get("confirm_password") ?? "");
+  const newPassword = String(formData.get("new_password") ?? formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirm_password") ?? formData.get("confirm") ?? "");
 
   if (!newPassword || newPassword.length < 6) {
     return { ok: false, error: "Le mot de passe doit faire au moins 6 caractères." };
