@@ -2,12 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// ============================================================================
-// CONNEXION
-// ============================================================================
 export async function signInAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
@@ -16,7 +13,7 @@ export async function signInAction(formData: FormData) {
     return { ok: false, error: "Email et mot de passe requis." };
   }
 
-  const supabase = await createServerSupabase();
+  const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -27,7 +24,6 @@ export async function signInAction(formData: FormData) {
     return { ok: false, error: "Email ou mot de passe incorrect." };
   }
 
-  // Vérifier si l'utilisateur est banni
   const admin = createAdminClient();
   const { data: profile } = await admin
     .from("profiles")
@@ -39,7 +35,7 @@ export async function signInAction(formData: FormData) {
     await supabase.auth.signOut();
     return {
       ok: false,
-      error: `Votre compte a été suspendu. Motif : ${profile.ban_reason || "Violation des CGU"}. Contactez le support.`,
+      error: `Votre compte a été suspendu. Motif : ${profile.ban_reason || "Violation des CGU"}.`,
     };
   }
 
@@ -47,9 +43,6 @@ export async function signInAction(formData: FormData) {
   return { ok: true };
 }
 
-// ============================================================================
-// INSCRIPTION
-// ============================================================================
 export async function signUpAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
@@ -65,11 +58,7 @@ export async function signUpAction(formData: FormData) {
     return { ok: false, error: "Le mot de passe doit faire au moins 6 caractères." };
   }
 
-  if (!["locataire", "proprietaire"].includes(role)) {
-    return { ok: false, error: "Rôle invalide." };
-  }
-
-  const supabase = await createServerSupabase();
+  const supabase = await createClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://vohitra-imo.com";
 
   const { data, error } = await supabase.auth.signUp({
@@ -77,11 +66,7 @@ export async function signUpAction(formData: FormData) {
     password,
     options: {
       emailRedirectTo: `${siteUrl}/auth/callback?next=/dashboard`,
-      data: {
-        full_name: fullName,
-        phone: phone || null,
-        role,
-      },
+      data: { full_name: fullName, phone: phone || null, role },
     },
   });
 
@@ -109,19 +94,13 @@ export async function signUpAction(formData: FormData) {
   return { ok: true, needsConfirmation: !data.session };
 }
 
-// ============================================================================
-// DÉCONNEXION
-// ============================================================================
 export async function signOutAction() {
-  const supabase = await createServerSupabase();
+  const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
   redirect("/");
 }
 
-// ============================================================================
-// MOT DE PASSE OUBLIÉ — envoi du mail
-// ============================================================================
 export async function forgotPasswordAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
 
@@ -129,28 +108,24 @@ export async function forgotPasswordAction(formData: FormData) {
     return { ok: false, error: "Email requis." };
   }
 
-  const supabase = await createServerSupabase();
+  const supabase = await createClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://vohitra-imo.com";
 
-  // FIX : redirige vers /auth/callback qui ensuite redirige vers /reset-password
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
   });
 
   if (error) {
     console.error("[forgotPassword] error:", error);
-    return { ok: false, error: "Erreur lors de l'envoi. Vérifiez votre email." };
+    return { ok: false, error: "Erreur lors de l'envoi." };
   }
 
   return {
     ok: true,
-    message: "Si un compte existe pour cet email, un lien de réinitialisation a été envoyé.",
+    message: "Si un compte existe pour cet email, un lien a été envoyé.",
   };
 }
 
-// ============================================================================
-// CHANGER LE MOT DE PASSE (utilisateur connecté)
-// ============================================================================
 export async function updatePasswordAction(formData: FormData) {
   const newPassword = String(formData.get("new_password") ?? "");
   const confirmPassword = String(formData.get("confirm_password") ?? "");
@@ -163,8 +138,7 @@ export async function updatePasswordAction(formData: FormData) {
     return { ok: false, error: "Les mots de passe ne correspondent pas." };
   }
 
-  const supabase = await createServerSupabase();
-
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return { ok: false, error: "Session expirée. Refaites une demande de réinitialisation." };
@@ -174,7 +148,7 @@ export async function updatePasswordAction(formData: FormData) {
 
   if (error) {
     console.error("[updatePassword] error:", error);
-    return { ok: false, error: "Erreur lors de la mise à jour. Réessayez." };
+    return { ok: false, error: "Erreur lors de la mise à jour." };
   }
 
   return { ok: true };
