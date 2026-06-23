@@ -151,5 +151,8 @@ export async function updatePasswordAction(formData: FormData) {
     return { ok: false, error: "Erreur lors de la mise à jour." };
   }
 
+
+  // Alias pour compatibilité avec l'ancienne page reset-password
+export const resetPasswordAction = updatePasswordAction;
   return { ok: true };
 }
