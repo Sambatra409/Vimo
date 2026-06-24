@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
+import { AuthRecoveryListener } from "@/components/auth-recovery-listener";
 import "./globals.css";
 
 // Chargement optimisé des 3 polices via next/font (auto self-hosted, pas de FOIT)
@@ -57,6 +58,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <AuthRecoveryListener />
           <div className="min-h-screen flex flex-col">
             <Header />
             <main className="flex-1">{children}</main>
