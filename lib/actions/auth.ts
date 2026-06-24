@@ -127,15 +127,20 @@ export async function forgotPasswordAction(formData: FormData) {
 }
 
 export async function updatePasswordAction(formData: FormData) {
+  // Accepte plusieurs noms de champ (compatibilité avec différents formulaires)
   const newPassword = String(formData.get("new_password") ?? formData.get("password") ?? "");
-  const confirmPassword = String(formData.get("confirm_password") ?? formData.get("confirm") ?? "");
 
   if (!newPassword || newPassword.length < 6) {
     return { ok: false, error: "Le mot de passe doit faire au moins 6 caractères." };
   }
 
-  if (newPassword !== confirmPassword) {
-    return { ok: false, error: "Les mots de passe ne correspondent pas." };
+  // Vérification de confirmation UNIQUEMENT si le champ confirm est présent dans le formulaire
+  const confirmField = formData.get("confirm_password") ?? formData.get("confirm");
+  if (confirmField !== null) {
+    const confirmPassword = String(confirmField);
+    if (newPassword !== confirmPassword) {
+      return { ok: false, error: "Les mots de passe ne correspondent pas." };
+    }
   }
 
   const supabase = await createClient();
