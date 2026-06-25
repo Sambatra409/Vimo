@@ -46,7 +46,8 @@ export async function signInAction(formData: FormData) {
 export async function signUpAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const fullName = String(formData.get("full_name") ?? "").trim();
+  // Accepte fullName (camelCase) OU full_name (snake_case) pour compatibilité
+  const fullName = String(formData.get("fullName") ?? formData.get("full_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const role = String(formData.get("role") ?? "locataire").trim();
 
