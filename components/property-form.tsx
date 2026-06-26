@@ -121,7 +121,7 @@ export function PropertyForm({ initial }: { initial?: InitialData }) {
           initialUrls={photoUrls}
           onChange={setPhotoUrls}
           propertyId={initial?.id ?? "draft"}
-          maxPhotos={5}
+          maxPhotos={10}
         />
       </Section>
 
