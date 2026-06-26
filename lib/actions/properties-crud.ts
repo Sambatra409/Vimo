@@ -66,7 +66,7 @@ function validatePropertyInput(
     return { ok: false, error: "Ville requise." };
   if (!input.photos || input.photos.length === 0)
     return { ok: false, error: "Ajoutez au moins une photo." };
-  if (input.photos.length > 5)
+  if (input.photos.length > 10)
     return { ok: false, error: "Maximum 5 photos autorisées." };
 
   // Numéro principal obligatoire
