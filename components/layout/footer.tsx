@@ -98,7 +98,7 @@ export async function Footer() {
 
       <div className="max-w-7xl mx-auto px-6 mt-12 pt-6 border-t border-border flex flex-col md:flex-row justify-between items-center gap-3 text-xs text-muted-foreground">
         <p>© {new Date().getFullYear()} {siteName} Immobilier Madagascar. Tous droits réservés.</p>
-        <p className="italic">Fait avec soin à Madagascar.</p>
+        <p className="italic">Proprios & clients, c'est tout.</p>
       </div>
     </footer>
   );
