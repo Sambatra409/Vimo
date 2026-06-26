@@ -116,7 +116,7 @@ export function PropertyForm({ initial }: { initial?: InitialData }) {
       </header>
 
       {/* Section 1 — Photos */}
-      <Section title="Photos" subtitle="Jusqu'à 5 photos. La première est la photo de couverture.">
+      <Section title="Photos" subtitle="Jusqu'à 10 photos. La première est la photo de couverture.">
         <PhotoUpload
           initialUrls={photoUrls}
           onChange={setPhotoUrls}
