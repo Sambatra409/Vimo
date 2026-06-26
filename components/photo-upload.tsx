@@ -24,7 +24,7 @@ export function PhotoUpload({
   initialUrls = [],
   onChange,
   propertyId = "draft",
-  maxPhotos = 5,
+  maxPhotos = 10,
 }: Props) {
   const [urls, setUrls] = useState<string[]>(initialUrls);
   const [busy, setBusy] = useState(false);
